@@ -1,107 +1,133 @@
-# Sultan Mart — Retail Management & Billing System
+# 🛒 Sultan Mart
+### Retail Management & Billing System
 
-A production-ready retail POS and management system built with Django REST Framework + React.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Django 4.2, Django REST Framework |
-| Auth | JWT (SimpleJWT) |
-| Database | PostgreSQL 15 |
-| Cache | Redis 7 |
-| Background Tasks | Celery + Celery Beat |
-| Frontend | React 18, Redux Toolkit, Tailwind CSS |
-| PDF Receipts | ReportLab (80mm thermal) |
-| WhatsApp | Twilio API |
-| Containerization | Docker + Docker Compose |
+> Production-ready POS + Admin system — Django REST Framework & React
 
 ---
 
-## Features
+## ⚡ Quick Start
 
-- **POS Billing** — Fast checkout, barcode scan, keyboard shortcuts (F2/F9/F8)
-- **Inventory** — Products, categories, stock tracking, batch/expiry, low-stock alerts
-- **Accounting** — Customers (udhar/credit), suppliers, purchase orders, expenses
-- **Reports** — Dashboard, sales trends, P&L, top products, Excel export
-- **Thermal Receipt** — 80mm PDF auto-print on checkout
-- **WhatsApp** — Send receipt to customer via Twilio
-- **E-commerce** — Online store with cart and order management
-- **Role-based Access** — Admin, Manager, Cashier
-- **Auto Backup** — Daily DB backup via Celery Beat
+### One-command setup
 
----
-
-## Quick Start (Local)
-
-### Prerequisites
-- Python 3.11+
-- Node.js 20+
-- PostgreSQL 15
-- Redis
-
-### Windows
-```bat
-setup.bat
-```
-
-### Linux / Mac
 ```bash
+# Windows
+setup.bat
+
+# Linux / Mac
 chmod +x setup.sh && ./setup.sh
 ```
 
-### Manual Steps
+### Manual
 
-**Backend:**
 ```bash
+# Backend
 cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env            # Edit DB credentials
+cp .env.example .env        # edit DB credentials
 python manage.py migrate
-python manage.py seed_data      # Creates admin + demo data
+python manage.py seed_data  # creates admin + demo data
 python manage.py runserver
-```
 
-**Frontend:**
-```bash
+# Frontend (new terminal)
 cd frontend
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
----
-
-## Docker (Production)
+### Docker (Production)
 
 ```bash
-cp backend/.env.example backend/.env   # Edit settings
+cp backend/.env.example backend/.env
 docker-compose up --build
 ```
 
-Services started:
-- `http://localhost:3000` — React frontend
-- `http://localhost:8000` — Django API
-- `http://localhost:8000/admin` — Django admin
-- `http://localhost:8000/api/docs/` — Swagger API docs
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:8000 |
+| Django Admin | http://localhost:8000/admin |
+| Swagger Docs | http://localhost:8000/api/docs/ |
 
 ---
 
-## Default Credentials
+## 🔐 Default Credentials
 
 | User | Password | Role |
 |------|----------|------|
 | admin | admin123 | Admin |
 | cashier | cashier123 | Cashier |
 
-**Change these immediately in production.**
+> ⚠️ Change these immediately in production.
 
 ---
 
-## Environment Variables (backend/.env)
+## 🧭 Access Control
+
+| Scenario | Behaviour |
+|----------|-----------|
+| Cashier login | Lands on POS only — all other URLs redirect to `/` |
+| Cashier → Admin mode | Click "Switch to Admin Mode" → enter PIN |
+| Admin / Manager login | Lands directly on Dashboard with full access |
+
+---
+
+## 🖥️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Django 4.2, Django REST Framework |
+| Auth | JWT (SimpleJWT) |
+| Database | PostgreSQL 15 |
+| Cache / Queue | Redis 7 + Celery + Celery Beat |
+| Frontend | React 18, Redux Toolkit, Vite |
+| Styling | Tailwind CSS |
+| PDF Receipts | ReportLab (80mm thermal) |
+| WhatsApp | Twilio API |
+| Containers | Docker + Docker Compose |
+
+---
+
+## ✨ Features
+
+- **POS Billing** — Fast checkout, barcode scan, keyboard shortcuts
+- **Inventory** — Products, categories, stock, batch/expiry, low-stock alerts
+- **Accounting** — Customers (udhar/credit), suppliers, purchases, expenses
+- **Reports** — Dashboard, sales trends, P&L, top products, Excel export
+- **Thermal Receipt** — 80mm PDF auto-print on checkout
+- **WhatsApp** — Send receipt via Twilio
+- **E-commerce** — Online store with cart & order management
+- **Role-based Access** — Admin, Manager, Cashier
+- **Auto Backup** — Daily DB backup via Celery Beat
+
+---
+
+## ⌨️ POS Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `F2` | Focus product search |
+| `F9` | Checkout |
+| `F8` | Print last receipt |
+| `ESC` | Clear search |
+
+---
+
+## 🌐 API Endpoints
+
+| Module | Base URL |
+|--------|----------|
+| Auth | `/api/auth/` |
+| Inventory | `/api/inventory/` |
+| Billing | `/api/billing/` |
+| Accounting | `/api/accounting/` |
+| Reports | `/api/reports/` |
+| E-commerce | `/api/ecommerce/` |
+
+Full interactive docs → `/api/docs/`
+
+---
+
+## ⚙️ Environment Variables
 
 ```env
 SECRET_KEY=your-secret-key
@@ -116,39 +142,13 @@ STORE_NAME=Sultan Mart
 STORE_ADDRESS=Your Store Address
 STORE_PHONE=+91 XXXXXXXXXX
 STORE_GST=YOUR_GSTIN
-TWILIO_ACCOUNT_SID=        # For WhatsApp
+TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 ```
 
 ---
 
-## POS Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| F2 | Focus product search |
-| F9 | Checkout |
-| F8 | Print last receipt |
-| ESC | Clear search |
-
----
-
-## API Endpoints
-
-| Module | Base URL |
-|--------|----------|
-| Auth | `/api/auth/` |
-| Inventory | `/api/inventory/` |
-| Billing | `/api/billing/` |
-| Accounting | `/api/accounting/` |
-| Reports | `/api/reports/` |
-| E-commerce | `/api/ecommerce/` |
-
-Full interactive docs at `/api/docs/`
-
----
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 sultan-mart/
@@ -166,7 +166,10 @@ sultan-mart/
 │       ├── pages/        # POS, Dashboard, Reports...
 │       ├── components/   # Layout, ReceiptPrint
 │       ├── store/        # Redux (auth, pos cart)
-│       └── api/          # Axios API clients
+│       └── api/          # Axios clients
 └── docker-compose.yml
 ```
-"# Sultan-mart" 
+
+---
+
+<p align="center">Sultan Mart © 2025 — Built with ❤️</p>
