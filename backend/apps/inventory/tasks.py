@@ -1,5 +1,8 @@
+import logging
 from celery import shared_task
 from django.db.models import F
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -12,10 +15,10 @@ def check_low_stock_alert():
 
     if low.exists():
         items = list(low)
-        # Log to console / can extend to email/WhatsApp
-        print(f"LOW STOCK ALERT: {len(items)} products need reorder")
+        logger.warning("LOW STOCK ALERT: %d products need reorder", len(items))
         for item in items:
-            print(f"  - {item['name']}: {item['stock_quantity']} remaining (threshold: {item['low_stock_threshold']})")
+            logger.warning("  - %s: %s remaining (threshold: %s)",
+                           item['name'], item['stock_quantity'], item['low_stock_threshold'])
     return f"Checked {low.count()} low stock items"
 
 
@@ -31,5 +34,6 @@ def check_expiring_batches():
     ).select_related('product')
 
     for batch in expiring:
-        print(f"EXPIRY ALERT: {batch.product.name} batch {batch.batch_number} expires on {batch.expiry_date}")
+        logger.warning("EXPIRY ALERT: %s batch %s expires on %s",
+                       batch.product.name, batch.batch_number, batch.expiry_date)
     return f"Checked {expiring.count()} expiring batches"

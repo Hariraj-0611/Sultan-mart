@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import {
@@ -178,8 +178,12 @@ export default function POSPage() {
   useEffect(() => {
     if (!customerSearch.trim()) return
     const timer = setTimeout(async () => {
-      const { data } = await accountingApi.getCustomers({ search: customerSearch })
-      setCustomers(data.results || data)
+      try {
+        const { data } = await accountingApi.getCustomers({ search: customerSearch })
+        setCustomers(data.results || data)
+      } catch {
+        toast.error('Customer search failed')
+      }
     }, 300)
     return () => clearTimeout(timer)
   }, [customerSearch])
@@ -277,11 +281,12 @@ export default function POSPage() {
       setShouldPrint(true)
     } catch (err) {
       const errData = err.response?.data
+      // Try to extract specific field errors
       const msg = errData?.error
         || errData?.detail
-        || (typeof errData === 'object' ? JSON.stringify(errData) : null)
+        || (typeof errData === 'object' ? Object.values(errData).flat()[0] : null)
         || 'Billing failed'
-      toast.error(msg, { duration: 6000 })
+      toast.error(typeof msg === 'string' ? msg : 'Billing failed', { duration: 6000 })
     } finally { setLoading(false) }
   }
 

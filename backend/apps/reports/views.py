@@ -1,11 +1,10 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, F, Q, Avg
+from django.db.models import Sum, Count, F
 from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
-from django.utils import timezone
 from django.http import HttpResponse
-from datetime import timedelta, date
+from datetime import timedelta
 import datetime
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -35,7 +34,6 @@ class DashboardView(APIView):
             stock_quantity__lte=F('low_stock_threshold'), is_active=True
         ).count()
 
-        # Last 7 days sales trend
         week_ago = today - timedelta(days=6)
         daily_trend = Invoice.objects.filter(
             created_at__date__gte=week_ago, status=Invoice.STATUS_PAID
@@ -57,17 +55,14 @@ class SalesReportView(APIView):
 
     def get(self, request):
         period = request.query_params.get('period', 'daily')
-        start = request.query_params.get('start')
-        end = request.query_params.get('end')
+        start  = request.query_params.get('start')
+        end    = request.query_params.get('end')
 
         qs = Invoice.objects.filter(status=Invoice.STATUS_PAID)
-        if start:
-            qs = qs.filter(created_at__date__gte=start)
-        if end:
-            qs = qs.filter(created_at__date__lte=end)
+        if start: qs = qs.filter(created_at__date__gte=start)
+        if end:   qs = qs.filter(created_at__date__lte=end)
 
         trunc_fn = {'daily': TruncDate, 'weekly': TruncWeek, 'monthly': TruncMonth}.get(period, TruncDate)
-
         data = qs.annotate(period=trunc_fn('created_at')).values('period').annotate(
             total_sales=Sum('total_amount'),
             total_discount=Sum('discount_amount'),
@@ -76,12 +71,9 @@ class SalesReportView(APIView):
         ).order_by('period')
 
         summary = qs.aggregate(
-            total=Sum('total_amount'),
-            discount=Sum('discount_amount'),
-            gst=Sum('gst_amount'),
-            count=Count('id'),
+            total=Sum('total_amount'), discount=Sum('discount_amount'),
+            gst=Sum('gst_amount'), count=Count('id'),
         )
-
         return Response({'data': list(data), 'summary': summary})
 
 
@@ -90,14 +82,12 @@ class ProductPerformanceView(APIView):
 
     def get(self, request):
         start = request.query_params.get('start')
-        end = request.query_params.get('end')
+        end   = request.query_params.get('end')
         limit = int(request.query_params.get('limit', 20))
 
         qs = InvoiceItem.objects.filter(invoice__status=Invoice.STATUS_PAID)
-        if start:
-            qs = qs.filter(invoice__created_at__date__gte=start)
-        if end:
-            qs = qs.filter(invoice__created_at__date__lte=end)
+        if start: qs = qs.filter(invoice__created_at__date__gte=start)
+        if end:   qs = qs.filter(invoice__created_at__date__lte=end)
 
         top_products = qs.values('product__name', 'product_id').annotate(
             total_qty=Sum('quantity'),
@@ -113,11 +103,10 @@ class ProfitLossView(APIView):
 
     def get(self, request):
         start = request.query_params.get('start')
-        end = request.query_params.get('end')
+        end   = request.query_params.get('end')
 
         inv_qs = Invoice.objects.filter(status=Invoice.STATUS_PAID)
         exp_qs = Expense.objects.all()
-
         if start:
             inv_qs = inv_qs.filter(created_at__date__gte=start)
             exp_qs = exp_qs.filter(date__gte=start)
@@ -125,33 +114,19 @@ class ProfitLossView(APIView):
             inv_qs = inv_qs.filter(created_at__date__lte=end)
             exp_qs = exp_qs.filter(date__lte=end)
 
-        sales = inv_qs.aggregate(
-            revenue=Sum('total_amount'),
-            discount=Sum('discount_amount'),
-            gst=Sum('gst_amount'),
-        )
-
-        # COGS from purchase prices
-        cogs = InvoiceItem.objects.filter(
-            invoice__in=inv_qs
-        ).aggregate(
-            total_cost=Sum(F('quantity') * F('product__purchase_price'))
-        )
-
+        sales    = inv_qs.aggregate(revenue=Sum('total_amount'), discount=Sum('discount_amount'), gst=Sum('gst_amount'))
+        cogs     = InvoiceItem.objects.filter(invoice__in=inv_qs).aggregate(total_cost=Sum(F('quantity') * F('product__purchase_price')))
         expenses = exp_qs.aggregate(total=Sum('amount'))
 
-        revenue = float(sales['revenue'] or 0)
-        cost = float(cogs['total_cost'] or 0)
+        revenue       = float(sales['revenue'] or 0)
+        cost          = float(cogs['total_cost'] or 0)
         expense_total = float(expenses['total'] or 0)
-        gross_profit = revenue - cost
-        net_profit = gross_profit - expense_total
+        gross_profit  = revenue - cost
+        net_profit    = gross_profit - expense_total
 
         return Response({
-            'revenue': revenue,
-            'cogs': cost,
-            'gross_profit': gross_profit,
-            'expenses': expense_total,
-            'net_profit': net_profit,
+            'revenue': revenue, 'cogs': cost, 'gross_profit': gross_profit,
+            'expenses': expense_total, 'net_profit': net_profit,
             'gross_margin': round((gross_profit / revenue * 100) if revenue else 0, 2),
         })
 
@@ -162,7 +137,7 @@ class ExportExcelView(APIView):
     def get(self, request):
         report_type = request.query_params.get('type', 'sales')
         start = request.query_params.get('start')
-        end = request.query_params.get('end')
+        end   = request.query_params.get('end')
 
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -173,25 +148,19 @@ class ExportExcelView(APIView):
             ws.title = 'Sales Report'
             headers = ['Invoice No', 'Date', 'Customer', 'Subtotal', 'Discount', 'GST', 'Total', 'Payment', 'Status']
             qs = Invoice.objects.select_related('customer')
-            if start:
-                qs = qs.filter(created_at__date__gte=start)
-            if end:
-                qs = qs.filter(created_at__date__lte=end)
-            rows = qs.values_list(
-                'invoice_number', 'created_at', 'customer__name',
-                'subtotal', 'discount_amount', 'gst_amount', 'total_amount',
-                'payment_method', 'status'
-            )
+            if start: qs = qs.filter(created_at__date__gte=start)
+            if end:   qs = qs.filter(created_at__date__lte=end)
+            rows = qs.values_list('invoice_number', 'created_at', 'customer__name',
+                                  'subtotal', 'discount_amount', 'gst_amount', 'total_amount',
+                                  'payment_method', 'status')
         elif report_type == 'inventory':
             ws.title = 'Inventory Report'
             headers = ['SKU', 'Product', 'Category', 'Stock', 'Purchase Price', 'Selling Price', 'Low Stock']
             rows = Product.objects.select_related('category').values_list(
                 'sku', 'name', 'category__name', 'stock_quantity',
-                'purchase_price', 'selling_price', 'low_stock_threshold'
-            )
+                'purchase_price', 'selling_price', 'low_stock_threshold')
         else:
-            rows = []
-            headers = []
+            rows, headers = [], []
 
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
@@ -203,9 +172,7 @@ class ExportExcelView(APIView):
             for col_idx, value in enumerate(row, 1):
                 ws.cell(row=row_idx, column=col_idx, value=str(value) if value else '')
 
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="{report_type}_report.xlsx"'
         wb.save(response)
         return response
@@ -215,39 +182,37 @@ class SettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from django.conf import settings as django_settings
+        from .models import StoreSettings
+        s = StoreSettings.get_settings()
         return Response({
-            'store_name':    getattr(django_settings, 'STORE_NAME', ''),
-            'store_address': getattr(django_settings, 'STORE_ADDRESS', ''),
-            'store_phone':   getattr(django_settings, 'STORE_PHONE', ''),
-            'store_gst':     getattr(django_settings, 'STORE_GST', ''),
+            'store_name':          s.store_name,
+            'store_address':       s.store_address,
+            'store_phone':         s.store_phone,
+            'store_gst':           s.store_gst,
+            'receipt_footer':      s.receipt_footer,
+            'show_gst_on_receipt': s.show_gst_on_receipt,
         })
 
     def post(self, request):
-        """Update .env file with new store settings"""
-        import os, re
-        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env')
-        fields = {
-            'STORE_NAME':    request.data.get('store_name', ''),
-            'STORE_ADDRESS': request.data.get('store_address', ''),
-            'STORE_PHONE':   request.data.get('store_phone', ''),
-            'STORE_GST':     request.data.get('store_gst', ''),
-        }
-        try:
-            with open(env_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            for key, value in fields.items():
-                pattern = rf'^{key}=.*$'
-                replacement = f'{key}={value}'
-                if re.search(pattern, content, re.MULTILINE):
-                    content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
-                else:
-                    content += f'\n{key}={value}'
-            with open(env_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            return Response({'success': True, 'message': 'Settings saved. Restart server to apply.'})
-        except Exception as e:
-            return Response({'error': str(e)}, status=400)
+        from .models import StoreSettings
+        s = StoreSettings.get_settings()
+        s.store_name    = request.data.get('store_name',    s.store_name)
+        s.store_address = request.data.get('store_address', s.store_address)
+        s.store_phone   = request.data.get('store_phone',   s.store_phone)
+        s.store_gst     = request.data.get('store_gst',     s.store_gst)
+        if 'receipt_footer' in request.data:
+            s.receipt_footer = request.data['receipt_footer']
+        if 'show_gst_on_receipt' in request.data:
+            s.show_gst_on_receipt = bool(request.data['show_gst_on_receipt'])
+        s.save()
+        return Response({
+            'store_name':          s.store_name,
+            'store_address':       s.store_address,
+            'store_phone':         s.store_phone,
+            'store_gst':           s.store_gst,
+            'receipt_footer':      s.receipt_footer,
+            'show_gst_on_receipt': s.show_gst_on_receipt,
+        })
 
 
 class LowStockView(APIView):
@@ -275,9 +240,7 @@ class CustomerHistoryView(APIView):
 
         invoices = Invoice.objects.filter(customer=customer).order_by('-created_at')[:20]
         payments = CustomerPayment.objects.filter(customer=customer).order_by('-created_at')[:10]
-
         total_spent = invoices.aggregate(t=Sum('total_amount'))['t'] or 0
-        visit_count = invoices.count()
 
         return Response({
             'customer': {
@@ -286,7 +249,7 @@ class CustomerHistoryView(APIView):
                 'outstanding_balance': float(customer.outstanding_balance),
             },
             'total_spent': float(total_spent),
-            'visit_count': visit_count,
+            'visit_count': invoices.count(),
             'invoices': InvoiceListSerializer(invoices, many=True).data,
             'payments': list(payments.values('amount', 'payment_method', 'created_at', 'notes')),
         })
@@ -297,30 +260,23 @@ class ExpiryTrackingView(APIView):
 
     def get(self, request):
         from apps.inventory.models import Batch
-        import datetime
-        today = datetime.date.today()
-        days = int(request.query_params.get('days', 30))
+        today     = datetime.date.today()
+        days      = int(request.query_params.get('days', 30))
         threshold = today + datetime.timedelta(days=days)
 
-        expired = Batch.objects.filter(
-            expiry_date__lt=today, quantity__gt=0
-        ).select_related('product').values(
-            'id', 'product__name', 'product__sku', 'batch_number',
-            'expiry_date', 'quantity'
+        expired = Batch.objects.filter(expiry_date__lt=today, quantity__gt=0).select_related('product').values(
+            'id', 'product__name', 'product__sku', 'batch_number', 'expiry_date', 'quantity'
         ).order_by('expiry_date')
 
         expiring_soon = Batch.objects.filter(
             expiry_date__gte=today, expiry_date__lte=threshold, quantity__gt=0
         ).select_related('product').values(
-            'id', 'product__name', 'product__sku', 'batch_number',
-            'expiry_date', 'quantity'
+            'id', 'product__name', 'product__sku', 'batch_number', 'expiry_date', 'quantity'
         ).order_by('expiry_date')
 
         return Response({
-            'expired': list(expired),
-            'expiring_soon': list(expiring_soon),
-            'expired_count': len(expired),
-            'expiring_soon_count': len(expiring_soon),
+            'expired': list(expired), 'expiring_soon': list(expiring_soon),
+            'expired_count': len(expired), 'expiring_soon_count': len(expiring_soon),
         })
 
 
@@ -330,8 +286,6 @@ class DashboardQuickStatsView(APIView):
     def get(self, request):
         from apps.accounting.models import Customer
         from apps.ecommerce.models import OnlineOrder
-        from apps.billing.models import Invoice
-        import datetime
 
         total_customers = Customer.objects.filter(is_active=True).count()
         total_products  = Product.objects.filter(is_active=True).count()
@@ -371,6 +325,7 @@ class WhatsAppReminderView(APIView):
 
     def post(self, request):
         from apps.accounting.models import Customer
+        from django.conf import settings as django_settings
         customer_id = request.data.get('customer_id')
         try:
             customer = Customer.objects.get(id=customer_id)
@@ -384,24 +339,23 @@ class WhatsAppReminderView(APIView):
         if balance <= 0:
             return Response({'error': 'No outstanding balance'}, status=400)
 
-        # Try to send via Twilio if configured
-        from django.conf import settings as django_settings
         sid   = getattr(django_settings, 'TWILIO_ACCOUNT_SID', '')
         token = getattr(django_settings, 'TWILIO_AUTH_TOKEN', '')
-        from_  = getattr(django_settings, 'TWILIO_WHATSAPP_FROM', '')
+        from_ = getattr(django_settings, 'TWILIO_WHATSAPP_FROM', '')
 
         if sid and token and from_:
             try:
                 from twilio.rest import Client
                 client = Client(sid, token)
-                msg = f"Dear {customer.name}, your outstanding balance at Sultan Mart is ₹{balance:.2f}. Please clear at your earliest convenience. Thank you!"
+                msg = (f"Dear {customer.name}, your outstanding balance at Sultan Mart is "
+                       f"Rs.{balance:.2f}. Please clear at your earliest convenience. Thank you!")
                 client.messages.create(body=msg, from_=from_, to=f"whatsapp:{customer.phone}")
                 return Response({'success': True, 'message': f'WhatsApp reminder sent to {customer.phone}'})
             except Exception as e:
                 return Response({'error': str(e)}, status=500)
         else:
-            # Return message template if Twilio not configured
-            msg = f"Dear {customer.name}, your outstanding balance at Sultan Mart is ₹{balance:.2f}. Please clear at your earliest convenience."
+            msg = (f"Dear {customer.name}, your outstanding balance at Sultan Mart is "
+                   f"Rs.{balance:.2f}. Please clear at your earliest convenience.")
             return Response({'success': False, 'message': 'Twilio not configured', 'template': msg})
 
 
@@ -409,11 +363,10 @@ class BackupView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Download full DB backup as JSON"""
         import json
         from django.core import serializers as dj_serializers
         from apps.billing.models import Invoice, InvoiceItem
-        from apps.accounting.models import Customer, Supplier, PurchaseOrder, Expense
+        from apps.accounting.models import Customer, Supplier, Expense
         from apps.inventory.models import Product, Category, Batch
 
         data = {}
@@ -434,7 +387,6 @@ class RestoreView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        """Restore DB from JSON backup file"""
         import json
         from django.core import serializers as dj_serializers
         from django.db import transaction
@@ -442,18 +394,14 @@ class RestoreView(APIView):
         backup_file = request.FILES.get('file')
         if not backup_file:
             return Response({'error': 'No file uploaded'}, status=400)
-
         try:
             data = json.loads(backup_file.read().decode('utf-8'))
         except Exception:
             return Response({'error': 'Invalid JSON file'}, status=400)
 
-        # Restore order matters — categories before products, customers before invoices
         restore_order = ['categories', 'customers', 'suppliers', 'products',
                          'batches', 'expenses', 'invoices', 'invoice_items']
-
-        restored = {}
-        errors = []
+        restored, errors = {}, []
         with transaction.atomic():
             for key in restore_order:
                 if key not in data:
@@ -468,7 +416,6 @@ class RestoreView(APIView):
 
         if errors:
             return Response({'success': False, 'errors': errors}, status=400)
-
         return Response({'success': True, 'restored': restored})
 
 
@@ -476,29 +423,21 @@ class VerifyPinView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from django.conf import settings as django_settings
-        pin = request.data.get('pin', '')
-        correct = getattr(django_settings, 'ADMIN_PIN', '1234')
+        from .models import StoreSettings
+        pin     = request.data.get('pin', '')
+        s       = StoreSettings.get_settings()
+        correct = s.admin_pin
         if pin == correct:
             return Response({'valid': True})
         return Response({'valid': False}, status=400)
 
     def put(self, request):
-        """Update PIN in .env file"""
-        import os, re
+        import re
+        from .models import StoreSettings
         new_pin = request.data.get('pin', '')
         if not re.match(r'^\d{4}$', new_pin):
             return Response({'error': 'PIN must be 4 digits'}, status=400)
-        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env')
-        try:
-            with open(env_path, 'r') as f:
-                content = f.read()
-            if re.search(r'^ADMIN_PIN=', content, re.MULTILINE):
-                content = re.sub(r'^ADMIN_PIN=.*', f'ADMIN_PIN={new_pin}', content, flags=re.MULTILINE)
-            else:
-                content += f'\nADMIN_PIN={new_pin}'
-            with open(env_path, 'w') as f:
-                f.write(content)
-            return Response({'success': True})
-        except Exception as e:
-            return Response({'error': str(e)}, status=400)
+        s = StoreSettings.get_settings()
+        s.admin_pin = new_pin
+        s.save()
+        return Response({'success': True})

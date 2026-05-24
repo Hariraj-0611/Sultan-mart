@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { reportsApi } from '../api/reports'
+import { useDispatch, useSelector } from 'react-redux'
+import { fetchSettings, saveSettings, selectSettings } from '../store/settingsSlice'
 import { inventoryApi } from '../api/inventory'
+import { reportsApi } from '../api/reports'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import {
   Save, Store, Lock, RefreshCw, AlertTriangle, Package,
-  Database, Upload, Printer, Sliders, Trash2, Info, Search
+  Database, Upload, Printer, Sliders, Trash2, Search
 } from 'lucide-react'
 
 function Section({ title, icon: Icon, children }) {
@@ -35,7 +37,10 @@ function Field({ label, value, onChange, placeholder, type='text', autoComplete,
 }
 
 export default function SettingsPage() {
-  const [form, setForm]       = useState({ store_name:'', store_address:'', store_phone:'', store_gst:'' })
+  const dispatch = useDispatch()
+  const storeSettings = useSelector(selectSettings)
+
+  const [form, setForm] = useState({ store_name:'', store_address:'', store_phone:'', store_gst:'' })
   const [receipt, setReceipt] = useState({ footer:'Thank you! Visit Again.', show_gst:true })
   const [pin, setPin]         = useState({ current:'', newPin:'', confirm:'' })
   const [lowStock, setLowStock]   = useState([])
@@ -52,17 +57,28 @@ export default function SettingsPage() {
   const f = (field) => (val) => setForm(p => ({ ...p, [field]: val }))
 
   useEffect(() => {
-    Promise.all([reportsApi.getSettings(), reportsApi.getLowStock(), reportsApi.getQuickStats()])
-      .then(([s, l, q]) => {
-        setForm(s.data)
-        setLowStock(l.data.products || [])
-        setStats(q.data)
-        // Load receipt settings from localStorage
-        const saved = JSON.parse(localStorage.getItem('receipt_settings') || '{}')
-        setReceipt(p => ({ ...p, ...saved }))
+    // Sync form from Redux store settings
+    if (storeSettings.loaded) {
+      setForm({
+        store_name:    storeSettings.store_name,
+        store_address: storeSettings.store_address,
+        store_phone:   storeSettings.store_phone,
+        store_gst:     storeSettings.store_gst,
       })
-      .catch(() => toast.error('Failed to load settings'))
-      .finally(() => setLoading(false))
+      setReceipt({
+        footer:   storeSettings.receipt_footer,
+        show_gst: storeSettings.show_gst_on_receipt,
+      })
+      setLoading(false)
+    }
+  }, [storeSettings.loaded, storeSettings.store_name, storeSettings.store_address,
+      storeSettings.store_phone, storeSettings.store_gst,
+      storeSettings.receipt_footer, storeSettings.show_gst_on_receipt])
+
+  useEffect(() => {
+    // Load quick stats separately
+    reportsApi.getQuickStats().then(q => setStats(q.data)).catch(() => {})
+    reportsApi.getLowStock().then(l => setLowStock(l.data.products || [])).catch(() => {})
   }, [])
 
   // Product search for stock adjustment
@@ -78,25 +94,46 @@ export default function SettingsPage() {
   const saveStore = async () => {
     setSaving(true)
     try {
-      await reportsApi.saveSettings(form)
-      toast.success('Store settings saved! Restart server to apply.')
+      await dispatch(saveSettings({
+        ...form,
+        receipt_footer:      receipt.footer,
+        show_gst_on_receipt: receipt.show_gst,
+      })).unwrap()
+      toast.success('Store settings saved — changes reflect everywhere instantly!')
     } catch { toast.error('Failed to save') }
     finally { setSaving(false) }
   }
 
-  const saveReceipt = () => {
-    localStorage.setItem('receipt_settings', JSON.stringify(receipt))
-    toast.success('Receipt settings saved!')
+  const saveReceipt = async () => {
+    setSaving(true)
+    try {
+      await dispatch(saveSettings({
+        store_name:          form.store_name,
+        store_address:       form.store_address,
+        store_phone:         form.store_phone,
+        store_gst:           form.store_gst,
+        receipt_footer:      receipt.footer,
+        show_gst_on_receipt: receipt.show_gst,
+      })).unwrap()
+      toast.success('Receipt settings saved!')
+    } catch { toast.error('Failed to save') }
+    finally { setSaving(false) }
   }
 
-  const savePin = () => {
-    const currentPin = localStorage.getItem('admin_pin') || '1234'
-    if (pin.current !== currentPin) return toast.error('Current PIN is wrong')
+  const savePin = async () => {
     if (!/^\d{4}$/.test(pin.newPin)) return toast.error('New PIN must be 4 digits')
     if (pin.newPin !== pin.confirm) return toast.error('PINs do not match')
-    localStorage.setItem('admin_pin', pin.newPin)
-    toast.success('PIN updated!')
-    setPin({ current:'', newPin:'', confirm:'' })
+    try {
+      // Verify current PIN first
+      await api.post('/reports/pin/', { pin: pin.current })
+    } catch {
+      return toast.error('Current PIN is wrong')
+    }
+    try {
+      await api.put('/reports/pin/', { pin: pin.newPin })
+      toast.success('PIN updated!')
+      setPin({ current:'', newPin:'', confirm:'' })
+    } catch { toast.error('Failed to update PIN') }
   }
 
   const adjustStock = async () => {

@@ -43,19 +43,25 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def receive_payment(self, request, pk=None):
+        from decimal import Decimal
         customer = self.get_object()
-        amount = float(request.data.get('amount', 0))
+        try:
+            amount = Decimal(str(request.data.get('amount', 0)))
+        except:
+            return Response({'error': 'Invalid amount format'}, status=400)
+            
         if amount <= 0:
-            return Response({'error': 'Invalid amount'}, status=400)
+            return Response({'error': 'Amount must be greater than zero'}, status=400)
+            
         CustomerPayment.objects.create(
             customer=customer, amount=amount,
             payment_method=request.data.get('payment_method', 'cash'),
             notes=request.data.get('notes', ''),
-            created_by=request.user,
+            created_by=request.user if request.user.is_authenticated else None,
         )
-        customer.outstanding_balance = max(0, float(customer.outstanding_balance) - amount)
+        customer.outstanding_balance = max(Decimal('0'), customer.outstanding_balance - amount)
         customer.save()
-        return Response({'outstanding_balance': customer.outstanding_balance})
+        return Response({'outstanding_balance': str(customer.outstanding_balance)})
 
 
 class SupplierViewSet(viewsets.ModelViewSet):

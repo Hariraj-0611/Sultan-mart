@@ -1,15 +1,21 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { selectCartCount } from '../store/cartSlice'
+import { selectSettings } from '../store/settingsSlice'
 import { ShoppingCart, Search, Phone, Mail, Package, ChevronRight,
          Facebook, Instagram, Twitter, MapPin, Clock, Truck } from 'lucide-react'
 import { useState } from 'react'
 
 export default function StoreLayout() {
   const cartCount = useSelector(selectCartCount)
+  const settings  = useSelector(selectSettings)
   const [search, setSearch] = useState('')
   const navigate  = useNavigate()
   const location  = useLocation()
+
+  const storeName    = settings.store_name    || 'Sultan Mart'
+  const storePhone   = settings.store_phone   || ''
+  const storeAddress = settings.store_address || ''
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -34,7 +40,7 @@ export default function StoreLayout() {
         <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 24px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ display:'flex', gap:20 }}>
             <span style={{ fontSize:11, color:'rgba(255,255,255,.5)', display:'flex', alignItems:'center', gap:5 }}>
-              <Phone size={10} /> +91 98765 43210
+              <Phone size={10} /> {storePhone || '+91 98765 43210'}
             </span>
             <span style={{ fontSize:11, color:'rgba(255,255,255,.5)', display:'flex', alignItems:'center', gap:5 }}>
               <Mail size={10} /> sultanmart@email.com
@@ -60,7 +66,7 @@ export default function StoreLayout() {
               <Package size={22} color="#fbbf24" />
             </div>
             <div>
-              <div style={{ fontSize:20, fontWeight:900, color:'#1a3c5e', lineHeight:1, letterSpacing:-.3 }}>Sultan Mart</div>
+              <div style={{ fontSize:20, fontWeight:900, color:'#1a3c5e', lineHeight:1, letterSpacing:-.3 }}>{storeName}</div>
               <div style={{ fontSize:9, color:'#94a3b8', letterSpacing:2, textTransform:'uppercase', marginTop:1 }}>Online Store</div>
             </div>
           </Link>
@@ -122,7 +128,7 @@ export default function StoreLayout() {
           <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 24px', display:'flex', gap:0, overflowX:'auto' }}>
             <Link to="/store/shop"
               style={{ padding:'10px 16px', fontSize:12, fontWeight:700, color:'#1a3c5e', textDecoration:'none', whiteSpace:'nowrap',
-                borderBottom: !searchParams ? '2px solid #1a3c5e' : '2px solid transparent' }}>
+                borderBottom: location.pathname === '/store/shop' && !location.search ? '2px solid #1a3c5e' : '2px solid transparent' }}>
               All Products
             </Link>
             {CATS.map(cat => (
@@ -182,7 +188,7 @@ export default function StoreLayout() {
               <div style={{ background:'linear-gradient(135deg,#1a3c5e,#2d6a9f)', borderRadius:10, padding:'8px 10px', display:'flex' }}>
                 <Package size={18} color="#fbbf24" />
               </div>
-              <span style={{ fontSize:20, fontWeight:900, color:'#fff', letterSpacing:-.3 }}>Sultan Mart</span>
+              <span style={{ fontSize:20, fontWeight:900, color:'#fff', letterSpacing:-.3 }}>{storeName}</span>
             </div>
             <p style={{ fontSize:13, lineHeight:1.8, color:'rgba(255,255,255,.5)', marginBottom:20, maxWidth:280 }}>
               Your trusted neighbourhood store, now online. Fresh products, great prices, delivered to your door.
@@ -217,9 +223,9 @@ export default function StoreLayout() {
           <div>
             <p style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:16, textTransform:'uppercase', letterSpacing:1 }}>Contact Us</p>
             {[
-              [Phone, '+91 98765 43210'],
+              [Phone, storePhone || '+91 98765 43210'],
               [Mail, 'sultanmart@email.com'],
-              [MapPin, '123 Main Street, Chennai'],
+              [MapPin, storeAddress || '123 Main Street'],
               [Clock, 'Open: 8AM – 10PM'],
             ].map(([Icon, text]) => (
               <div key={text} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
@@ -231,13 +237,10 @@ export default function StoreLayout() {
         </div>
 
         <div style={{ borderTop:'1px solid rgba(255,255,255,.06)', padding:'16px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', maxWidth:1280, margin:'0 auto' }}>
-          <span style={{ fontSize:12, color:'rgba(255,255,255,.3)' }}>© {new Date().getFullYear()} Sultan Mart. All rights reserved.</span>
+          <span style={{ fontSize:12, color:'rgba(255,255,255,.3)' }}>© {new Date().getFullYear()} {storeName}. All rights reserved.</span>
           <span style={{ fontSize:12, color:'rgba(255,255,255,.3)' }}>Powered by Sultan Mart POS</span>
         </div>
       </footer>
     </div>
   )
 }
-
-// dummy to avoid unused import warning
-const searchParams = null

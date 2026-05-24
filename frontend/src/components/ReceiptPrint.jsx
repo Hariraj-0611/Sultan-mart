@@ -1,6 +1,9 @@
 import { forwardRef } from 'react'
+import { useSelector } from 'react-redux'
+import { selectSettings } from '../store/settingsSlice'
 
 const ReceiptPrint = forwardRef(({ invoice }, ref) => {
+  const settings = useSelector(selectSettings)
   if (!invoice) return <div ref={ref} />
 
   const subtotal = parseFloat(invoice.subtotal || 0)
@@ -15,9 +18,13 @@ const ReceiptPrint = forwardRef(({ invoice }, ref) => {
   const dateStr = date.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
   const timeStr = date.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true })
 
-  const receiptSettings = JSON.parse(localStorage.getItem('receipt_settings') || '{}')
-  const footerMsg = receiptSettings.footer || 'Thank you! Visit Again.'
-  const showGst   = receiptSettings.show_gst !== false
+  // Use Redux settings (live from DB), fall back to invoice snapshot
+  const storeName    = settings.store_name    || invoice.store_name    || 'Sultan Mart'
+  const storeAddress = settings.store_address || invoice.store_address || ''
+  const storePhone   = settings.store_phone   || invoice.store_phone   || ''
+  const storeGst     = settings.store_gst     || invoice.store_gst     || ''
+  const footerMsg    = settings.receipt_footer || 'Thank you! Visit Again.'
+  const showGst      = settings.show_gst_on_receipt !== false
 
   const Line = () => <div style={{ borderTop:'1px dashed #000', margin:'5px 0' }} />
   const ThickLine = () => <div style={{ borderTop:'2px solid #000', margin:'5px 0' }} />
@@ -34,11 +41,11 @@ const ReceiptPrint = forwardRef(({ invoice }, ref) => {
       {/* ── HEADER ── */}
       <div style={{ textAlign:'center', marginBottom:'6px' }}>
         <div style={{ fontSize:'18px', fontWeight:'900', letterSpacing:'2px', textTransform:'uppercase' }}>
-          {invoice.store_name || 'Sultan Mart'}
+          {storeName}
         </div>
-        {invoice.store_address && <div style={{ fontSize:'10px', marginTop:'2px' }}>{invoice.store_address}</div>}
-        {invoice.store_phone   && <div style={{ fontSize:'10px' }}>📞 {invoice.store_phone}</div>}
-        {invoice.store_gst     && <div style={{ fontSize:'10px' }}>GSTIN: {invoice.store_gst}</div>}
+        {storeAddress && <div style={{ fontSize:'10px', marginTop:'2px' }}>{storeAddress}</div>}
+        {storePhone   && <div style={{ fontSize:'10px' }}>📞 {storePhone}</div>}
+        {storeGst     && <div style={{ fontSize:'10px' }}>GSTIN: {storeGst}</div>}
       </div>
 
       <ThickLine />

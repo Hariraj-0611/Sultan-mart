@@ -30,14 +30,24 @@ class InvoiceSerializer(serializers.ModelSerializer):
     store_phone   = serializers.SerializerMethodField()
     store_gst     = serializers.SerializerMethodField()
 
-    def get_store_name(self, obj):    return getattr(settings, 'STORE_NAME', '')
-    def get_store_address(self, obj): return getattr(settings, 'STORE_ADDRESS', '')
-    def get_store_phone(self, obj):   return getattr(settings, 'STORE_PHONE', '')
-    def get_store_gst(self, obj):     return getattr(settings, 'STORE_GST', '')
+    def _get_store(self):
+        from apps.reports.models import StoreSettings
+        return StoreSettings.get_settings()
+
+    def get_store_name(self, obj):    return self._get_store().store_name
+    def get_store_address(self, obj): return self._get_store().store_address
+    def get_store_phone(self, obj):   return self._get_store().store_phone
+    def get_store_gst(self, obj):     return self._get_store().store_gst
 
     class Meta:
         model = Invoice
-        fields = '__all__'
+        fields = [
+            'id', 'invoice_number', 'customer', 'customer_name', 'customer_phone',
+            'cashier', 'cashier_name', 'subtotal', 'discount_amount', 'gst_amount',
+            'total_amount', 'amount_paid', 'change_amount', 'credit_amount',
+            'payment_method', 'status', 'notes', 'items', 'payment_splits',
+            'store_name', 'store_address', 'store_phone', 'store_gst', 'created_at'
+        ]
         read_only_fields = ['invoice_number', 'cashier', 'subtotal', 'gst_amount',
                             'total_amount', 'change_amount']
 

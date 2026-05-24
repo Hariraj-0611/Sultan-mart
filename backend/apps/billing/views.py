@@ -47,16 +47,26 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def send_whatsapp(self, request, pk=None):
         invoice = self.get_object()
-        phone = request.data.get('phone') or (invoice.customer.phone if invoice.customer else None)
+        phone = request.data.get('phone')
+        
         if not phone:
-            return Response({'error': 'Phone number required'}, status=400)
-        # Send directly without Celery
+            if invoice.customer and invoice.customer.phone:
+                phone = invoice.customer.phone
+            else:
+                return Response({'error': 'No phone number found for this customer. Please provide one.'}, status=400)
+
         try:
             from twilio.rest import Client
             from django.conf import settings as django_settings
-            clean_phone = ''.join(filter(str.isdigit, phone))
+            
+            # Better phone cleaning
+            clean_phone = ''.join(c for c in str(phone) if c.isdigit())
+            if not clean_phone:
+                return Response({'error': 'Invalid phone number format'}, status=400)
+            
             if len(clean_phone) == 10:
                 clean_phone = '91' + clean_phone
+            
             client = Client(django_settings.TWILIO_ACCOUNT_SID, django_settings.TWILIO_AUTH_TOKEN)
             items_text = '\n'.join([f"  {item.product_name} x{item.quantity} = Rs.{item.total_price}" for item in invoice.items.all()])
             message_body = (
